@@ -1,0 +1,55 @@
+{
+  "name": "Faxina: limpar temporarios de video",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "2f0bde99-43ca-5508-96b3-2f82977799b5",
+      "name": "A cada 1 hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "command": "find /home/node/files -maxdepth 1 -type f \\( -name '*.mp4' -o -name '*.mp3' -o -name '*.ass' \\) -mmin +180 -print -delete"
+      },
+      "id": "ee5c5e08-62be-5b52-995d-f4743e84e7a8",
+      "name": "Apagar arquivos com +3h",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "A cada 1 hora": {
+      "main": [
+        [
+          {
+            "node": "Apagar arquivos com +3h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

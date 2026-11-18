@@ -1,0 +1,705 @@
+{
+  "name": "Auto-cortes documentario -> YouTube",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "ID_DA_PASTA_MONITORADA",
+          "mode": "list",
+          "cachedResultName": "Pasta monitorada (configurar)"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "e59c4ce7-3e30-5ad5-ac73-d4f469705d97",
+      "name": "Drive: novo vídeo",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        3136,
+        592
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CREDENCIAL_GOOGLE_DRIVE",
+          "name": "Google Drive (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "value": "={{ $('Drive: novo vídeo').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {}
+        }
+      },
+      "id": "4f8a6303-552e-5966-beb7-1a2c62532168",
+      "name": "Drive: baixar vídeo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3664,
+        592
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CREDENCIAL_GOOGLE_DRIVE",
+          "name": "Google Drive (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "mkdir -p /home/node/files"
+      },
+      "id": "e79d5ad6-a30f-5b27-9c6b-8100d3029010",
+      "name": "Garantir pasta de trabalho",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3312,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "=Cortes - {{ $('Drive: novo vídeo').item.json.name.replace(/\\.[^.]+$/, '').replace(/[\\\\/:*?\"<>|]/g, '-').trim() }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "root",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "ee0323ba-d20e-5d8a-81a7-46bd2d442460",
+      "name": "Drive: criar pasta dos cortes",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3488,
+        592
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CREDENCIAL_GOOGLE_DRIVE",
+          "name": "Google Drive (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/node/files/{{ $('Drive: novo vídeo').item.json.id }}.mp4",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "212fca34-21ee-5856-9a8d-b3dc6939b24a",
+      "name": "Salvar vídeo no disco",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        3840,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -y -i /home/node/files/{{ $('Drive: novo vídeo').item.json.id }}.mp4 -vn -acodec libmp3lame -ar 16000 -ac 1 -b:a 64k /home/node/files/{{ $('Drive: novo vídeo').item.json.id }}.mp3"
+      },
+      "id": "97026c09-5dbd-5ec5-b3ad-ae7352e25bf9",
+      "name": "ffmpeg: extrair áudio",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4576,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/home/node/files/{{ $('Drive: novo vídeo').item.json.id }}.mp3",
+        "options": {}
+      },
+      "id": "f9b6f08c-8caf-5c3c-90a8-4a749b501776",
+      "name": "Ler áudio (.mp3)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4752,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "name": "timestamp_granularities[]",
+              "value": "segment"
+            }
+          ]
+        },
+        "options": {},
+        "nodeCredentialType": "openAiApi"
+      },
+      "id": "3e5913a3-b398-5363-8161-62d3ee10a6fd",
+      "name": "Whisper: transcrever (com timestamps)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4928,
+        592
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "CREDENCIAL_OPENAI",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta a transcrição com timestamps, guarda os segmentos brutos\n// (usados depois para nunca cortar no meio de uma frase) e\n// calcula quantos cortes o vídeo comporta.\nconst segs = $input.first().json.segments || [];\nconst linhas = segs.map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text.trim()}`);\nconst duracaoTotal = segs.length ? segs[segs.length - 1].end : 0;\n\n// Teto de 5: TikTok zera views acima disso, e 5 uploads cabem na cota do YouTube.\nconst META_MIN = 2;\nconst META_MAX = 5;\nconst alvoCortes = Math.max(META_MIN, Math.min(META_MAX, Math.floor(duracaoTotal / 150)));\n\nreturn [{\n  json: {\n    transcricao_com_tempo: linhas.join('\\n'),\n    duracao_total: duracaoTotal,\n    duracao_minutos: +(duracaoTotal / 60).toFixed(1),\n    alvo_cortes: alvoCortes,\n    // segmentos crus: o node seguinte usa isso para alinhar o corte ao fim de frase\n    segmentos: segs.map(s => ({ start: s.start, end: s.end, text: (s.text || '').trim() }))\n  }\n}];\n"
+      },
+      "id": "be09d420-7586-5109-a474-3ba716ed787c",
+      "name": "Montar transcrição c/ timestamps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5104,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Este vídeo tem {{ $json.duracao_minutos }} minutos de duração.\nGere EXATAMENTE {{ $json.alvo_cortes }} cortes a partir da transcrição abaixo.\n\nTRANSCRIÇÃO:\n{{ $json.transcricao_com_tempo }}",
+        "options": {
+          "systemMessage": "Você é roteirista de retenção para YouTube Shorts e TikTok. Seu trabalho NÃO é resumir o vídeo — é escolher trechos que fazem alguém parar de rolar o feed e assistir até o fim.\n\n════ REGRA Nº 1: NUNCA CORTE UMA HISTÓRIA PELA METADE ════\nEste é o erro mais grave que você pode cometer. Cada corte precisa ser uma UNIDADE COMPLETA:\n• Começa quando o assunto começa — não no meio de uma explicação já em andamento.\n• Termina depois que o assunto se resolve — a informação foi entregue, a história teve desfecho, a pergunta foi respondida.\n• Se um caso, uma fofoca, uma polêmica ou um raciocínio leva 2 minutos para ser contado do começo ao fim, o corte tem que ter os 2 minutos inteiros. É MELHOR fazer menos cortes e mais longos do que cortes pela metade.\n• Antes de fechar cada corte, faça este teste: 'quem assistir só isso, sem ver o resto do vídeo, entende a história completa e sai satisfeito?' Se a resposta for não, aumente o trecho.\n• Prefira sempre esticar o fim a cortar antes da hora. Terminar em suspense sem resolução irrita e derruba a retenção.\n\n════ COMO ESCOLHER OS TRECHOS ════\n1. Procure blocos com TENSÃO E RESOLUÇÃO completas: um caso contado do início ao fim, uma revelação com o contexto que a antecede, um número chocante com a explicação, uma reviravolta com o desfecho.\n2. Comece já dentro do assunto — pule apresentação, introdução e 'antes de começar'.\n3. Distribua ao longo de TODO o vídeo, não concentre no começo.\n4. Cada corte com um ÂNGULO DIFERENTE dos outros. Varie: um sobre um número, outro sobre uma história pessoal, outro sobre um perigo, outro sobre uma comparação. Isso é obrigatório.\n\n════ DURAÇÃO ════\nEntre 75 e 165 segundos. Se a história pedir mais tempo para ficar completa, use até 165. Nunca sacrifique a história para caber num tempo menor.\nOs trechos não podem se sobrepor.\n\n════ OS TEXTOS DA TELA ════\n\n• hook — MÁXIMO 28 caracteres. Fica na tela o clipe inteiro, em amarelo e grande. É o que decide se a pessoa fica.\n  Use uma destas cinco fórmulas, escolhendo a que o trecho realmente entrega:\n   1. CHOQUE NUMÉRICO — 'Ele fez isso 400 vezes', '3 mortes por semana'\n   2. PARADOXO — 'Ela pagou para trabalhar'\n   3. CONFISSÃO — 'Ele confessou tudo'\n   4. PROMESSA ESPECÍFICA — 'O que acharam no porao'\n   5. PERGUNTA PROVOCATIVA — 'Voce faria isso por dinheiro?'\n  Imperativos como 'olha isso' funcionam SOMENTE quando apontam para algo concreto. 'OLHA ISSO' sozinho é vazio; 'Olha o que ele fez depois' funciona.\n  O hook NUNCA pode prometer o que o trecho não entrega.\n\n• titulo — MÁXIMO 42 caracteres. NÃO aparece na tela: é o título do vídeo no YouTube, e deve ser buscável.\n\n• texto_meio — MÁXIMO 26 caracteres. Aparece na metade, quando a atenção cai: 'Espera o final', 'Mas tem mais', 'E o pior ainda vem'. Só escreva se o trecho tiver mesmo uma segunda virada; se não tiver, devolva string vazia.\n\n• pergunta_final — MÁXIMO 42 caracteres. Últimos segundos. Pergunta de opinião fácil de responder. NÃO peça like nem inscrição.\n\n• descricao — 2 a 4 frases para a descrição do YouTube, com as palavras-chave do assunto.\n\nResponda APENAS com JSON válido, sem markdown e sem texto antes ou depois:\n{\"cortes\":[{\"indice\":1,\"inicio_seg\":12.5,\"fim_seg\":120.0,\"hook\":\"...\",\"titulo\":\"...\",\"texto_meio\":\"...\",\"pergunta_final\":\"...\",\"descricao\":\"...\"}]}\ninicio_seg e fim_seg em segundos, coerentes com os timestamps recebidos."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        5312,
+        592
+      ],
+      "id": "f880f5c9-09b7-547d-a54b-b392da80e3c4",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        5232,
+        864
+      ],
+      "id": "3b52e6fe-bd0d-5e3d-903c-90591f2361b4",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "CREDENCIAL_OPENAI",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Para cada corte:\n//  1) ALINHA o início e o fim aos limites de fala do Whisper,\n//     para nunca cortar no meio de uma frase\n//  2) escreve um .ass com textos cronometrados\n//  3) monta o comando ffmpeg (9:16, fundo desfocado, texto queimado)\n// ============================================================\n\nconst raw = ($json.output ?? $json.text ?? '').toString();\nconst match = raw.match(/\\{[\\s\\S]*\\}/);\nif (!match) {\n  throw new Error('Não encontrei JSON na resposta do agente: ' + raw.slice(0, 300));\n}\nconst parsed = JSON.parse(match[0]);\nif (!Array.isArray(parsed.cortes) || parsed.cortes.length === 0) {\n  throw new Error('Resposta do agente não trouxe a chave \"cortes\" como lista.');\n}\n\nconst videoId = $('Drive: novo vídeo').first().json.id;\nconst dadosTransc = $('Montar transcrição c/ timestamps').first().json;\nconst segmentos = dadosTransc.segmentos || [];\nconst duracaoTotal = Number(dadosTransc.duracao_total) || 0;\n\nconst PASTA = '/home/node/files';\nconst PASTA_FONTES = '/opt/fonts';\n\n// --- duração ------------------------------------------------\nconst MIN_DURACAO = 75;    // mínimo em segundos\nconst MAX_DURACAO = 165;   // máximo (Shorts precisa ficar abaixo de 180s)\nconst FOLGA_FIM = 1.2;     // respiro depois da última palavra\n\n// --- textos na tela -----------------------------------------\nconst TEXTO_TOPO_FIXO = true; // true = o hook amarelo fica do início ao fim\nconst HOOK_ATE = 4.0;         // só usado se TEXTO_TOPO_FIXO = false\nconst MEIO_INICIO_PCT = 0.42;\nconst MEIO_DURACAO = 4.5;\nconst PERGUNTA_ANTES_FIM = 6.0;\n\n// --- estética -----------------------------------------------\nconst LARGURA = 1080;\nconst ALTURA = 1920;\nconst FONTE_NOME = 'DejaVu Sans';\nconst FONT_HOOK = 104;\nconst FONT_TITULO = 78;\nconst FONT_MEIO = 72;\nconst FONT_PERGUNTA = 68;\nconst FONT_PARTE = 42;\nconst TOPO_TEXTO = 235;\nconst TOPO_PARTE = 145;\nconst BAIXO_MEIO = 500;\nconst BAIXO_PERGUNTA = 500;\nconst COR_HOOK = '&H0000FFFF';     // amarelo\nconst COR_TITULO = '&H00FFFFFF';\nconst COR_MEIO = '&H0000FFFF';\nconst COR_PERGUNTA = '&H00FFFFFF';\nconst CAIXA = 'B4';\nconst BLUR_FUNDO = 28;\nconst MOSTRAR_SELO_PARTE = true;\n// --- animação -----------------------------------------------\nconst FADE_ENTRA = 250;\nconst FADE_SAI = 250;\nconst POP_HOOK = true;\nconst POP_ESCALA = 92;\nconst POP_MS = 220;\n// ------------------------------------------------------------\n\nif (duracaoTotal && duracaoTotal < MIN_DURACAO) {\n  throw new Error(\n    `O vídeo tem só ${duracaoTotal.toFixed(0)}s — é curto demais para cortes de ${MIN_DURACAO}s.`\n  );\n}\n\n// ============================================================\n// ALINHAMENTO AO FIM DE FRASE\n// ============================================================\n\n// Um segmento \"fecha ideia\" quando termina em pontuação final.\nfunction fechaIdeia(txt) {\n  return /[.!?…][\"'”’)\\]]?\\s*$/.test((txt || '').trim());\n}\n\n// Início: encosta no começo de uma FRASE nova, nunca no meio de um raciocínio.\n// Um segmento começa frase nova quando o segmento anterior fechou a ideia.\nfunction comecaFrase(indice) {\n  if (indice === 0) return true;\n  return fechaIdeia(segmentos[indice - 1].text);\n}\n\nfunction alinharInicio(alvo, minimo) {\n  const cands = segmentos\n    .map((s, i) => ({ start: s.start, novaFrase: comecaFrase(i) }))\n    .filter(s => s.start >= minimo - 0.01);\n  if (!cands.length) return Math.max(alvo, minimo);\n\n  const antes = cands.filter(s => s.start <= alvo);\n  // 1ª escolha: o último começo de FRASE antes do alvo\n  const frasesAntes = antes.filter(s => s.novaFrase);\n  if (frasesAntes.length) return frasesAntes[frasesAntes.length - 1].start;\n  // 2ª: qualquer começo de fala antes do alvo\n  if (antes.length) return antes[antes.length - 1].start;\n  // 3ª: o primeiro começo de frase disponível\n  const frase = cands.find(s => s.novaFrase);\n  return frase ? frase.start : cands[0].start;\n}\n\n// Fim: prioriza terminar onde a frase fecha, dentro da janela permitida.\nfunction alinharFim(alvo, minAbs, maxAbs) {\n  const dentro = segmentos.filter(s => s.end >= minAbs && s.end <= maxAbs);\n  if (!dentro.length) return Math.min(Math.max(alvo, minAbs), maxAbs);\n\n  const comPonto = dentro.filter(s => fechaIdeia(s.text));\n  const lista = comPonto.length ? comPonto : dentro;\n\n  let melhor = lista[0], menorDist = Infinity;\n  for (const s of lista) {\n    const d = Math.abs(s.end - alvo);\n    if (d < menorDist) { menorDist = d; melhor = s; }\n  }\n  return melhor.end;\n}\n\n// ============================================================\n\nfunction limpar(t, max) {\n  return (t || '')\n    .toString()\n    .replace(/[{}]/g, '')\n    .replace(/\\\\/g, '')\n    .replace(/[\\r\\n]+/g, ' ')\n    .replace(/[\"`$]/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .slice(0, max || 90);\n}\n\nfunction nomeArquivoSeguro(t) {\n  return (t || '').toString()\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .replace(/\\s+/g, ' ').trim().slice(0, 60);\n}\n\nfunction tempoAss(s) {\n  s = Math.max(0, s);\n  const h = Math.floor(s / 3600);\n  const m = Math.floor((s % 3600) / 60);\n  const seg = s % 60;\n  return `${h}:${String(m).padStart(2, '0')}:${seg.toFixed(2).padStart(5, '0')}`;\n}\n\n// ---- 1) ordena ----\nconst ordenados = [...parsed.cortes].sort(\n  (a, b) => Number(a.inicio_seg) - Number(b.inicio_seg)\n);\n\n// ---- 2) alinha à fala + garante duração ----\nconst limite = duracaoTotal || Infinity;\nlet fimAnterior = 0;\nconst ajustados = [];\n\nfor (const c of ordenados) {\n  const pedidoIni = Math.max(0, Number(c.inicio_seg));\n  const pedidoFim = Number(c.fim_seg);\n\n  // início encostado no começo de uma fala, sem invadir o corte anterior\n  const inicio = alinharInicio(Math.max(pedidoIni, fimAnterior), fimAnterior);\n\n  // janela possível para o fim\n  const minAbs = Math.min(inicio + MIN_DURACAO, limite);\n  const maxAbs = Math.min(inicio + MAX_DURACAO, limite);\n  const alvoFim = Math.max(pedidoFim, minAbs);\n\n  let fim = alinharFim(alvoFim, minAbs, maxAbs) + FOLGA_FIM;\n  if (fim > limite) fim = limite;\n\n  const duracao = fim - inicio;\n  if (duracao < MIN_DURACAO * 0.9) continue; // não sobrou vídeo suficiente\n\n  fimAnterior = fim;\n  ajustados.push({ ...c, inicio_seg: inicio, fim_seg: fim, duracao_seg: duracao });\n}\n\nif (ajustados.length === 0) {\n  throw new Error(\n    `Nenhum corte atingiu ${MIN_DURACAO}s dentro dos ${duracaoTotal.toFixed(0)}s do vídeo.`\n  );\n}\n\n// ---- 3) legenda + comando ----\nreturn ajustados.map((c, i) => {\n  const indice = i + 1;\n  const total = ajustados.length;\n  const inicio = c.inicio_seg;\n  const duracao = c.duracao_seg;\n\n  const hook = limpar(c.hook || c.titulo, 60);\n  const titulo = limpar(c.titulo, 70);\n  const meio = limpar(c.texto_meio, 60);\n  const pergunta = limpar(c.pergunta_final, 70);\n\n  const arquivoSaida = `${PASTA}/${videoId}_parte${indice}.mp4`;\n  const arquivoAss = `${PASTA}/${videoId}_parte${indice}.ass`;\n\n  const fimClipe = duracao;\n  const hookAte = TEXTO_TOPO_FIXO ? fimClipe : Math.min(HOOK_ATE, duracao * 0.15);\n  const meioInicio = duracao * MEIO_INICIO_PCT;\n  const perguntaInicio = Math.max(meioInicio + MEIO_DURACAO + 1, duracao - PERGUNTA_ANTES_FIM);\n\n  const fade = `\\\\fad(${FADE_ENTRA},${FADE_SAI})`;\n  const pop = POP_HOOK\n    ? `\\\\fscx${POP_ESCALA}\\\\fscy${POP_ESCALA}\\\\t(0,${POP_MS},\\\\fscx100\\\\fscy100)`\n    : '';\n\n  const eventos = [];\n  const D = (ini, fim, estilo, texto, efeito) =>\n    `Dialogue: 0,${tempoAss(ini)},${tempoAss(fim)},${estilo},,0,0,0,,{${efeito || fade}}${texto}`;\n\n  if (MOSTRAR_SELO_PARTE) {\n    eventos.push(D(0, fimClipe, 'Parte', `PARTE ${indice}/${total}`));\n  }\n  eventos.push(D(0, hookAte, 'Hook', hook, fade + pop));\n  if (!TEXTO_TOPO_FIXO && titulo && titulo !== hook) {\n    eventos.push(D(hookAte, fimClipe, 'Titulo', titulo));\n  }\n  if (meio) {\n    eventos.push(D(meioInicio, meioInicio + MEIO_DURACAO, 'Meio', meio));\n  }\n  if (pergunta && perguntaInicio < fimClipe) {\n    eventos.push(D(perguntaInicio, fimClipe, 'Pergunta', pergunta));\n  }\n\n  const ass = [\n    '[Script Info]',\n    'ScriptType: v4.00+',\n    `PlayResX: ${LARGURA}`,\n    `PlayResY: ${ALTURA}`,\n    'WrapStyle: 0',\n    'ScaledBorderAndShadow: yes',\n    '',\n    '[V4+ Styles]',\n    'Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',\n    `Style: Parte,${FONTE_NOME},${FONT_PARTE},&H00FFFFFF,&H00000000,&H80000000,-1,3,4,0,8,40,40,${TOPO_PARTE},1`,\n    `Style: Hook,${FONTE_NOME},${FONT_HOOK},${COR_HOOK},&H00000000,&H${CAIXA}000000,-1,3,8,3,8,45,45,${TOPO_TEXTO},1`,\n    `Style: Titulo,${FONTE_NOME},${FONT_TITULO},${COR_TITULO},&H00000000,&H${CAIXA}000000,-1,3,6,2,8,45,45,${TOPO_TEXTO},1`,\n    `Style: Meio,${FONTE_NOME},${FONT_MEIO},${COR_MEIO},&H00000000,&H${CAIXA}000000,-1,3,6,2,2,145,145,${BAIXO_MEIO},1`,\n    `Style: Pergunta,${FONTE_NOME},${FONT_PERGUNTA},${COR_PERGUNTA},&H00000000,&H${CAIXA}000000,-1,3,6,2,2,145,145,${BAIXO_PERGUNTA},1`,\n    '',\n    '[Events]',\n    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',\n    ...eventos\n  ].join('\\n');\n\n  const filtro =\n    `[0:v]split=2[bg][fg];` +\n    `[bg]scale=${LARGURA}:${ALTURA}:force_original_aspect_ratio=increase,` +\n    `crop=${LARGURA}:${ALTURA},gblur=sigma=${BLUR_FUNDO}[bgb];` +\n    `[fg]scale=${LARGURA}:-2[fgs];` +\n    `[bgb][fgs]overlay=(W-w)/2:(H-h)/2,` +\n    `subtitles=filename=${arquivoAss}:fontsdir=${PASTA_FONTES}[v]`;\n\n  const comando =\n    `cat > ${arquivoAss} <<'ASSEOF'\\n${ass}\\nASSEOF\\n` +\n    `ffmpeg -y -ss ${inicio.toFixed(2)} -t ${duracao.toFixed(2)} -i ${PASTA}/${videoId}.mp4 ` +\n    `-filter_complex \"${filtro}\" -map \"[v]\" -map 0:a? ` +\n    `-c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -r 30 ` +\n    `-c:a aac -b:a 128k -movflags +faststart ${arquivoSaida}`;\n\n  return {\n    json: {\n      indice, total_partes: total,\n      inicio_seg: inicio, fim_seg: c.fim_seg, duracao_seg: duracao,\n      titulo: c.titulo, hook, texto_meio: meio, pergunta_final: pergunta,\n      descricao: c.descricao,\n      arquivo_saida: arquivoSaida, arquivo_ass: arquivoAss,\n      nome_arquivo: `Parte ${indice} - ${nomeArquivoSeguro(c.titulo)}.mp4`,\n      comando_ffmpeg: comando\n    }\n  };\n});\n"
+      },
+      "id": "eecc2924-7221-5f3d-a790-af6b21c748fd",
+      "name": "Montar cortes + comando de edição",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5520,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "97ce9663-a07c-5c13-a77b-feea7947674b",
+      "name": "Loop: 1 corte por vez",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5728,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.comando_ffmpeg }}"
+      },
+      "id": "ff5721e6-bdb9-5342-bd3e-885d67ce70f5",
+      "name": "ffmpeg: editar corte 9x16 + legenda",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        5936,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Loop: 1 corte por vez').item.json.arquivo_saida }}",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "01d88962-5c77-5543-aefa-549bf73314f3",
+      "name": "Ler clipe editado",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        6112,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Loop: 1 corte por vez').item.json.nome_arquivo }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Drive: criar pasta dos cortes').first().json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "68c9b2e4-5c94-593e-807d-9bd24251960f",
+      "name": "Drive: salvar corte na pasta",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        6288,
+        752
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CREDENCIAL_GOOGLE_DRIVE",
+          "name": "Google Drive (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Loop: 1 corte por vez').item.json.titulo }} — Parte {{ $('Loop: 1 corte por vez').item.json.indice }}/{{ $('Loop: 1 corte por vez').item.json.total_partes }}",
+        "regionCode": "BR",
+        "categoryId": "22",
+        "options": {
+          "description": "={{ $('Loop: 1 corte por vez').item.json.descricao }}\n\n{{ $('Loop: 1 corte por vez').item.json.pergunta_final }}\n\nParte {{ $('Loop: 1 corte por vez').item.json.indice }} de {{ $('Loop: 1 corte por vez').item.json.total_partes }}.",
+          "privacyStatus": "private"
+        }
+      },
+      "id": "4e8e3001-937e-5315-93ad-7ac94713d9e7",
+      "name": "YouTube: subir corte",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        6640,
+        752
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "CREDENCIAL_YOUTUBE",
+          "name": "YouTube (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "id": "e4cfd904-3054-5b30-8d69-9546bfd9d0b8",
+      "name": "Esperar 5 minutos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6816,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=rm -f /home/node/files/{{ $('Drive: novo vídeo').first().json.id }}*"
+      },
+      "id": "a5beaff0-5d57-550f-87bf-210e42d6e17b",
+      "name": "Limpar arquivos temporários",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        5936,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Loop: 1 corte por vez').item.json.arquivo_saida }}",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "275bf8d8-1b3a-5de5-8e84-0d4190def9c8",
+      "name": "Reler clipe (para o YouTube)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        6464,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -hide_banner -i /home/node/files/{{ $('Drive: novo vídeo').item.json.id }}.mp4 -af silencedetect=noise=-32dB:d=0.6 -f null -"
+      },
+      "id": "2943da9a-fc53-574d-9cb3-2a5bd227b453",
+      "name": "Mapear silêncios",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4016,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Lê a saída do silencedetect e monta o comando ffmpeg que\n// remove os silêncios do vídeo de origem numa única passada.\n//\n// Feito ANTES da transcrição: assim os timestamps do Whisper já\n// nascem no tempo real (sem silêncio) e a duração mínima dos\n// cortes passa a ser tempo de fala de verdade.\n// ============================================================\n\n// --- ajustes ------------------------------------------------\nconst MARGEM = 0.15;       // segundos de silêncio mantidos em cada ponta (respiro)\nconst MAX_TRECHOS = 220;   // teto de trechos, pra não estourar o comando\nconst MIN_TRECHO = 0.25;   // descarta trecho menor que isso (ruído solto)\n// Trava de segurança: se fosse cortar mais que isso, algo está errado\n// (limiar mal calibrado, áudio muito baixo) e é melhor não cortar nada.\nconst LIMITE_SEGURANCA = 40;  // em % da duração\n// Vídeo muito longo: as duas passadas de ffmpeg travariam o worker por muito tempo.\n// Acima disso, segue sem cortar silêncio.\nconst MAX_MINUTOS = 75;\n// ------------------------------------------------------------\n\nconst PASTA = '/home/node/files';\nconst videoId = $('Drive: novo vídeo').first().json.id;\nconst entrada = `${PASTA}/${videoId}.mp4`;\nconst saida = `${PASTA}/${videoId}_tight.mp4`;\n\n// O silencedetect escreve no stderr\nconst bruto = ($json.stderr || '') + '\\n' + ($json.stdout || '');\n\n// Duração total do vídeo (vem do \"time=\" da última linha de progresso)\nlet duracaoTotal = 0;\nfor (const m of bruto.matchAll(/time=(\\d+):(\\d+):([\\d.]+)/g)) {\n  const t = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);\n  if (t > duracaoTotal) duracaoTotal = t;\n}\nif (!duracaoTotal) {\n  throw new Error('Não consegui ler a duração do vídeo na saída do ffmpeg.');\n}\n\n// Pares de silêncio\nconst inicios = [...bruto.matchAll(/silence_start:\\s*([\\d.]+)/g)].map(m => Number(m[1]));\nconst fins = [...bruto.matchAll(/silence_end:\\s*([\\d.]+)/g)].map(m => Number(m[1]));\n\nconst silencios = [];\nfor (let i = 0; i < inicios.length; i++) {\n  // Se o vídeo termina em silêncio, não vem o silence_end correspondente\n  const fim = i < fins.length ? fins[i] : duracaoTotal;\n  silencios.push([inicios[i], fim]);\n}\n\n// Vídeo longo demais para as duas passadas: segue sem cortar\nif (duracaoTotal > MAX_MINUTOS * 60) {\n  return [{\n    json: {\n      houve_corte: false,\n      motivo: `vídeo de ${(duracaoTotal / 60).toFixed(0)}min passa do teto de ${MAX_MINUTOS}min — ` +\n              `o corte de silêncio ficaria lento demais no worker`,\n      arquivo_final: entrada,\n      duracao_antes: +duracaoTotal.toFixed(2),\n      duracao_depois: +duracaoTotal.toFixed(2),\n      percentual_cortado: 0,\n      comando_ffmpeg: `echo \"corte de silencio ignorado: video muito longo\"`\n    }\n  }];\n}\n\n// Sem silêncio detectado: segue com o arquivo original, sem gastar encode\nif (!silencios.length) {\n  return [{\n    json: {\n      houve_corte: false,\n      arquivo_final: entrada,\n      duracao_antes: +duracaoTotal.toFixed(2),\n      duracao_depois: +duracaoTotal.toFixed(2),\n      comando_ffmpeg: `echo \"sem silencio detectado, mantendo ${entrada}\"`\n    }\n  }];\n}\n\n// Monta os trechos a MANTER (o inverso dos silêncios), com margem\nconst manter = [];\nlet cursor = 0;\nfor (const [si, sf] of silencios) {\n  const fimTrecho = Math.min(si + MARGEM, duracaoTotal);\n  if (fimTrecho - cursor >= MIN_TRECHO) manter.push([cursor, fimTrecho]);\n  cursor = Math.max(0, sf - MARGEM);\n}\nif (duracaoTotal - cursor >= MIN_TRECHO) manter.push([cursor, duracaoTotal]);\n\n// Junta trechos que ficaram colados (a margem pode ter fechado o buraco)\nconst juntos = [];\nfor (const t of manter) {\n  const ult = juntos[juntos.length - 1];\n  if (ult && t[0] - ult[1] < 0.05) ult[1] = t[1];\n  else juntos.push([...t]);\n}\n\nif (juntos.length > MAX_TRECHOS) {\n  throw new Error(\n    `${juntos.length} trechos passariam do teto de ${MAX_TRECHOS}. ` +\n    `Aumente MARGEM ou o \"d=\" do silencedetect para agrupar mais.`\n  );\n}\n\nconst duracaoDepois = juntos.reduce((s, [a, b]) => s + (b - a), 0);\nconst percentual = 100 * (1 - duracaoDepois / duracaoTotal);\n\n// Cortar demais é sinal de problema, não de eficiência\nif (percentual > LIMITE_SEGURANCA) {\n  return [{\n    json: {\n      houve_corte: false,\n      motivo: `cortaria ${percentual.toFixed(1)}% do vídeo (teto de ${LIMITE_SEGURANCA}%) — ` +\n              `provavelmente o áudio está baixo ou o limiar de dB está errado`,\n      arquivo_final: entrada,\n      duracao_antes: +duracaoTotal.toFixed(2),\n      duracao_depois: +duracaoTotal.toFixed(2),\n      percentual_cortado: 0,\n      comando_ffmpeg: `echo \"corte de silencio ignorado: cortaria ${percentual.toFixed(1)}%\"`\n    }\n  }];\n}\n\n// Uma passada só: select/aselect com as janelas, e setpts pra recolar o tempo\nconst expr = juntos\n  .map(([a, b]) => `between(t,${a.toFixed(3)},${b.toFixed(3)})`)\n  .join('+');\n\nconst comando =\n  `ffmpeg -y -i ${entrada} ` +\n  `-vf \"select='${expr}',setpts=N/FRAME_RATE/TB\" ` +\n  `-af \"aselect='${expr}',asetpts=N/SR/TB\" ` +\n  `-c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p ` +\n  `-c:a aac -b:a 128k ${saida} && mv -f ${saida} ${entrada}`;\n\nreturn [{\n  json: {\n    houve_corte: true,\n    arquivo_final: entrada,\n    trechos: juntos.length,\n    silencios_removidos: silencios.length,\n    duracao_antes: +duracaoTotal.toFixed(2),\n    duracao_depois: +duracaoDepois.toFixed(2),\n    segundos_cortados: +(duracaoTotal - duracaoDepois).toFixed(2),\n    percentual_cortado: +percentual.toFixed(1),\n    comando_ffmpeg: comando\n  }\n}];\n"
+      },
+      "id": "e18947cd-e5ce-58a0-8f69-31513a7e24c5",
+      "name": "Montar corte de silêncio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4208,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.comando_ffmpeg }}"
+      },
+      "id": "84659ecb-ba62-5f2b-a098-5a625dcba576",
+      "name": "ffmpeg: remover silêncio",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        592
+      ]
+    }
+  ],
+  "connections": {
+    "Drive: novo vídeo": {
+      "main": [
+        [
+          {
+            "node": "Garantir pasta de trabalho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: baixar vídeo": {
+      "main": [
+        [
+          {
+            "node": "Salvar vídeo no disco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Garantir pasta de trabalho": {
+      "main": [
+        [
+          {
+            "node": "Drive: criar pasta dos cortes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: criar pasta dos cortes": {
+      "main": [
+        [
+          {
+            "node": "Drive: baixar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar vídeo no disco": {
+      "main": [
+        [
+          {
+            "node": "Mapear silêncios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ffmpeg: extrair áudio": {
+      "main": [
+        [
+          {
+            "node": "Ler áudio (.mp3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler áudio (.mp3)": {
+      "main": [
+        [
+          {
+            "node": "Whisper: transcrever (com timestamps)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar transcrição c/ timestamps": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Montar cortes + comando de edição",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar cortes + comando de edição": {
+      "main": [
+        [
+          {
+            "node": "Loop: 1 corte por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop: 1 corte por vez": {
+      "main": [
+        [
+          {
+            "node": "Limpar arquivos temporários",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ffmpeg: editar corte 9x16 + legenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler clipe editado": {
+      "main": [
+        [
+          {
+            "node": "Drive: salvar corte na pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: salvar corte na pasta": {
+      "main": [
+        [
+          {
+            "node": "Reler clipe (para o YouTube)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube: subir corte": {
+      "main": [
+        [
+          {
+            "node": "Esperar 5 minutos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Loop: 1 corte por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper: transcrever (com timestamps)": {
+      "main": [
+        [
+          {
+            "node": "Montar transcrição c/ timestamps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ffmpeg: editar corte 9x16 + legenda": {
+      "main": [
+        [
+          {
+            "node": "Ler clipe editado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reler clipe (para o YouTube)": {
+      "main": [
+        [
+          {
+            "node": "YouTube: subir corte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear silêncios": {
+      "main": [
+        [
+          {
+            "node": "Montar corte de silêncio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar corte de silêncio": {
+      "main": [
+        [
+          {
+            "node": "ffmpeg: remover silêncio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ffmpeg: remover silêncio": {
+      "main": [
+        [
+          {
+            "node": "ffmpeg: extrair áudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

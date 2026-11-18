@@ -1,0 +1,495 @@
+{
+  "name": "Cacador de pautas -> Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "118d2d84-88d6-5971-b8db-ac1f6851254f",
+      "name": "Diariamente às 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails,statistics,status"
+            },
+            {
+              "name": "chart",
+              "value": "mostPopular"
+            },
+            {
+              "name": "regionCode",
+              "value": "BR"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "02e422db-b978-5fcb-b5e5-2bff85cfcf9a",
+      "name": "YouTube: em alta no Brasil",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        180
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "CREDENCIAL_YOUTUBE",
+          "name": "YouTube (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Termo de busca do dia. Rotaciona pelo dia da semana para não\n// procurar sempre a mesma coisa.\n// Nicho: PODCAST E MESA DE DEBATE de futebol brasileiro.\n// ============================================================\n\n// --- edite aqui os temas do canal ---------------------------\nconst TERMOS_POR_DIA = [\n  'podcast futebol brasileiro debate',      // domingo\n  'mesa redonda brasileirao analise',        // segunda (pós-rodada)\n  'entrevista jogador brasileirao',          // terça\n  'debate libertadores analise',             // quarta\n  'bastidores futebol brasileiro podcast',   // quinta\n  'coletiva tecnico brasileirao',            // sexta\n  'programa esportivo debate futebol'        // sábado\n];\nconst DIAS_PARA_TRAS = 14;   // futebol envelhece rápido: janela curta\n// ------------------------------------------------------------\n\nconst hoje = new Date();\nconst termo = TERMOS_POR_DIA[hoje.getDay() % TERMOS_POR_DIA.length];\nconst depois = new Date(hoje.getTime() - DIAS_PARA_TRAS * 86400000);\n\nreturn [{\n  json: {\n    termo,\n    published_after: depois.toISOString(),\n    dia_semana: hoje.getDay()\n  }\n}];\n"
+      },
+      "id": "e58fb243-6c72-5801-8e98-c3e408927cf8",
+      "name": "Termos do dia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "={{ $json.termo }}"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "order",
+              "value": "viewCount"
+            },
+            {
+              "name": "regionCode",
+              "value": "BR"
+            },
+            {
+              "name": "relevanceLanguage",
+              "value": "pt"
+            },
+            {
+              "name": "publishedAfter",
+              "value": "={{ $json.published_after }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            },
+            {
+              "name": "videoLicense",
+              "value": "creativeCommon"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "51f0a6ba-1157-5ca4-bb2f-76ca5ce50daa",
+      "name": "YouTube: buscar por tema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        420
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "CREDENCIAL_YOUTUBE",
+          "name": "YouTube (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails,statistics,status"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.items.map(i => i.id.videoId).join(',') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "96dcb2ea-6523-5c03-aa71-e494b721cb8d",
+      "name": "Detalhes dos buscados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        420
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "CREDENCIAL_YOUTUBE",
+          "name": "YouTube (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "4f142a3d-de5e-5d8c-b349-d753341a4e8c",
+      "name": "Juntar fontes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Junta os vídeos das duas fontes (em alta + busca por tema),\n// filtra o que não serve para virar corte e ranqueia o resto.\n// ============================================================\n\n// --- critérios (ajuste aqui) --------------------------------\nconst DUR_MIN_MIN = 12;     // duração mínima (podcast curto não rende 5 cortes)\nconst DUR_MAX_MIN = 75;     // duração máxima (acima disso o processamento fica lento)\n// CC tem muito menos views que vídeo comum — piso baixo de propósito.\n// Depois de ver o que aparece, você calibra.\nconst VIEWS_MIN = 3000;     // views mínimas\nconst IDIOMAS = ['pt'];     // prefixos aceitos ([] = qualquer idioma)\n// Só aceita vídeo com licença Creative Commons (reuso permitido, exige crédito).\n// Coloque false para aceitar qualquer licença.\nconst SO_CREATIVE_COMMONS = true;\n// Nicho futebol: a categoria 17 (Esportes) agora é DESEJADA.\n// Bloqueia só o que não tem fala pra transcrever.\n// 10=Música 20=Gaming 1=Filme/Animação\nconst CATEGORIAS_BLOQUEADAS = ['10', '20', '1'];\n// Em futebol, o que atrapalha é IMAGEM DE PARTIDA (não tem fala pra cortar,\n// e é o conteúdo mais reivindicado do YouTube). 'ao vivo' e 'live' saíram da\n// lista porque quase todo podcast é transmitido ao vivo antes de ser postado —\n// vídeo longo demais já é barrado pela duração.\nconst TITULO_BLOQUEADO = [\n  'melhores momentos', 'gols de', 'todos os gols', 'compacto',\n  'resumo do jogo', 'assista os gols', 'lances do jogo',\n  'clipe oficial', 'official video', 'lyric', 'gameplay', 'trailer',\n  'fifa', 'efootball', 'shorts'\n];\n// ------------------------------------------------------------\n\nfunction duracaoParaSegundos(iso) {\n  const m = /^P(?:(\\d+)D)?T?(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?$/.exec(iso || '');\n  if (!m) return 0;\n  const [, d, h, mi, s] = m.map(v => Number(v || 0));\n  return d * 86400 + h * 3600 + mi * 60 + s;\n}\n\nfunction semAcento(t) {\n  return (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();\n}\n\n// Junta os `items` de todas as entradas (as duas fontes)\nconst brutos = [];\nfor (const entrada of $input.all()) {\n  const lista = entrada.json.items || [];\n  for (const v of lista) brutos.push(v);\n}\n\nif (!brutos.length) {\n  throw new Error('Nenhuma das duas fontes devolveu vídeo. Verifique a credencial do YouTube e a cota.');\n}\n\nconst vistos = new Set();\nconst candidatos = [];\nconst recusados = [];\n\nfor (const v of brutos) {\n  const id = typeof v.id === 'string' ? v.id : (v.id && v.id.videoId);\n  if (!id || vistos.has(id)) continue;\n  vistos.add(id);\n\n  const sn = v.snippet || {};\n  const cd = v.contentDetails || {};\n  const st = v.statistics || {};\n  const stt = v.status || {};\n  const licenca = stt.license || 'desconhecida';\n\n  const titulo = (sn.title || '').trim();\n  const categoria = String(sn.categoryId || '');\n  const idioma = (sn.defaultAudioLanguage || sn.defaultLanguage || '').toLowerCase();\n  const dur = duracaoParaSegundos(cd.duration);\n  const views = Number(st.viewCount || 0);\n  const tl = semAcento(titulo);\n\n  const motivo = [];\n  if (SO_CREATIVE_COMMONS && licenca !== 'creativeCommon') {\n    motivo.push(`licença ${licenca}`);\n  }\n  if (!cd.duration) motivo.push('sem duração (faltou o videos.list)');\n  if (dur && dur < DUR_MIN_MIN * 60) motivo.push(`curto (${Math.round(dur / 60)}min)`);\n  if (dur > DUR_MAX_MIN * 60) motivo.push(`longo (${Math.round(dur / 60)}min)`);\n  if (views < VIEWS_MIN) motivo.push(`poucas views (${views})`);\n  if (CATEGORIAS_BLOQUEADAS.includes(categoria)) motivo.push(`categoria ${categoria}`);\n  if (IDIOMAS.length && idioma && !IDIOMAS.some(p => idioma.startsWith(p))) {\n    motivo.push(`idioma ${idioma}`);\n  }\n  const palavra = TITULO_BLOQUEADO.find(p => tl.includes(semAcento(p)));\n  if (palavra) motivo.push(`título contém \"${palavra}\"`);\n  if (/^P\\d+D/.test(cd.duration || '')) motivo.push('duração absurda (live?)');\n\n  if (motivo.length) {\n    recusados.push({ titulo: titulo.slice(0, 55), motivo: motivo.join(', ') });\n    continue;\n  }\n\n  candidatos.push({\n    video_id: id,\n    titulo,\n    canal: (sn.channelTitle || '').trim(),\n    url: `https://www.youtube.com/watch?v=${id}`,\n    duracao_seg: dur,\n    duracao_min: +(dur / 60).toFixed(1),\n    views,\n    categoria,\n    idioma: idioma || 'nao informado',\n    licenca,\n    embutivel: stt.embeddable !== false,\n    publicado_em: sn.publishedAt || null,\n    // views por minuto: favorece vídeo denso em vez de só longo\n    nota: Math.round(views / Math.max(1, dur / 60))\n  });\n}\n\ncandidatos.sort((a, b) => b.nota - a.nota);\n\nif (!candidatos.length) {\n  // Conta os motivos, pra você saber QUAL filtro está barrando tudo\n  const porMotivo = {};\n  for (const r of recusados) {\n    for (const m of r.motivo.split(', ')) {\n      const chave = m.replace(/\\(.*\\)/, '').trim();\n      porMotivo[chave] = (porMotivo[chave] || 0) + 1;\n    }\n  }\n  throw new Error(\n    `Nenhum dos ${brutos.length} vídeos passou. Contagem por motivo: ` +\n    JSON.stringify(porMotivo) +\n    ` | Exemplos: ${JSON.stringify(recusados.slice(0, 4))}`\n  );\n}\n\nreturn candidatos.map(c => ({\n  json: { ...c, total_candidatos: candidatos.length, total_analisados: brutos.length }\n}));\n"
+      },
+      "id": "8aa45599-4e79-5e91-8fe0-c31f031bfa52",
+      "name": "Filtrar e ranquear",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "SELECIONE_A_TABELA",
+          "mode": "list"
+        },
+        "filters": {
+          "conditions": []
+        },
+        "options": {}
+      },
+      "id": "4f667c97-89d0-5ac9-8e7d-c9e6ca9a73c5",
+      "name": "Histórico: já usados",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        240,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Compara os candidatos com o histórico e escolhe o melhor\n// vídeo que ainda não foi usado.\n// ============================================================\n\nconst candidatos = $input.all().map(i => i.json);\n\n// O histórico vem do node do Data Table. Se a tabela estiver\n// vazia, ele devolve nada — e aí tudo é inédito.\nconst historico = $('Histórico: já usados').all()\n  .map(i => i.json)\n  .filter(r => r && (r.video_id || r.videoId));\n\nconst usados = new Set(historico.map(r => String(r.video_id || r.videoId)));\n\nconst inedito = candidatos.find(c => !usados.has(String(c.video_id)));\n\nif (!inedito) {\n  throw new Error(\n    `Todos os ${candidatos.length} candidatos de hoje já foram usados ` +\n    `(${usados.size} no histórico). Nada novo para processar.`\n  );\n}\n\n// Nome do arquivo que vai pro Drive e pro disco\nfunction nomeSeguro(t) {\n  return (t || '')\n    .normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .slice(0, 70);\n}\n\nconst arquivoLocal = `/home/node/files/origem_${inedito.video_id}.mp4`;\n\nreturn [{\n  json: {\n    ...inedito,\n    arquivo_local: arquivoLocal,\n    nome_no_drive: `${nomeSeguro(inedito.titulo)} [${inedito.video_id}].mp4`,\n    descartados_por_repeticao: candidatos.length - candidatos.filter(c => !usados.has(String(c.video_id))).length,\n    total_no_historico: usados.size,\n    // atribuição, para entrar na descrição do vídeo publicado\n    // Creative Commons exige atribuição: este texto vai na descrição do vídeo publicado\n    creditos: `Trecho de \"${inedito.titulo}\" por ${inedito.canal}\\n${inedito.url}\\n`\n      + `Licença: Creative Commons Atribuição (CC BY) — https://creativecommons.org/licenses/by/3.0/`,\n    licenca_original: inedito.licenca\n  }\n}];\n"
+      },
+      "id": "5a51cf93-d6f6-5323-9080-2ffff8fac4c6",
+      "name": "Escolher vídeo inédito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=yt-dlp --no-playlist --no-warnings --no-progress --max-filesize 1500M -f \"bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b\" --merge-output-format mp4 -o \"{{ $json.arquivo_local }}\" \"{{ $json.url }}\""
+      },
+      "id": "98dbb4a6-990e-5c83-9dac-ea8acc4d22a0",
+      "name": "Baixar com yt-dlp",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Escolher vídeo inédito').item.json.arquivo_local }}",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "f0b65982-4e43-57d7-879d-0e2122fee79e",
+      "name": "Ler vídeo baixado",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Escolher vídeo inédito').item.json.nome_no_drive }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "ID_DA_PASTA_MONITORADA",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "c66556b7-f074-53ab-a116-f9adf55ea352",
+      "name": "Drive: subir na pasta monitorada",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1860,
+        300
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CREDENCIAL_GOOGLE_DRIVE",
+          "name": "Google Drive (OAuth2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "SELECIONE_A_TABELA",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $('Escolher vídeo inédito').item.json.video_id }}",
+            "titulo": "={{ $('Escolher vídeo inédito').item.json.titulo }}",
+            "canal": "={{ $('Escolher vídeo inédito').item.json.canal }}",
+            "url": "={{ $('Escolher vídeo inédito').item.json.url }}",
+            "nota": "={{ $('Escolher vídeo inédito').item.json.nota }}",
+            "usado_em": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "5c9feb33-265d-54c4-b4d1-58fc2b15e833",
+      "name": "Histórico: registrar",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=rm -f {{ $('Escolher vídeo inédito').item.json.arquivo_local }}"
+      },
+      "id": "b24c9839-49e8-5213-ab28-7dbfa1d59a32",
+      "name": "Apagar cópia local",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2260,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Diariamente às 6h": {
+      "main": [
+        [
+          {
+            "node": "YouTube: em alta no Brasil",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Termos do dia",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Histórico: já usados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube: em alta no Brasil": {
+      "main": [
+        [
+          {
+            "node": "Juntar fontes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Termos do dia": {
+      "main": [
+        [
+          {
+            "node": "YouTube: buscar por tema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube: buscar por tema": {
+      "main": [
+        [
+          {
+            "node": "Detalhes dos buscados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detalhes dos buscados": {
+      "main": [
+        [
+          {
+            "node": "Juntar fontes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Juntar fontes": {
+      "main": [
+        [
+          {
+            "node": "Filtrar e ranquear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar e ranquear": {
+      "main": [
+        [
+          {
+            "node": "Escolher vídeo inédito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher vídeo inédito": {
+      "main": [
+        [
+          {
+            "node": "Baixar com yt-dlp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar com yt-dlp": {
+      "main": [
+        [
+          {
+            "node": "Ler vídeo baixado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler vídeo baixado": {
+      "main": [
+        [
+          {
+            "node": "Drive: subir na pasta monitorada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: subir na pasta monitorada": {
+      "main": [
+        [
+          {
+            "node": "Histórico: registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Histórico: registrar": {
+      "main": [
+        [
+          {
+            "node": "Apagar cópia local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

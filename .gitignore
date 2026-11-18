@@ -1,0 +1,24 @@
+# Segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+
+# Midia gerada ou de teste
+*.mp4
+*.mp3
+*.mov
+*.mkv
+*.ass
+videos/
+files/
+n8n_data/
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
